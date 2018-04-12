@@ -1,8 +1,7 @@
-# helloworld
+#ZJUWLAN_connect
 
-A new Flutter project.
+目前能够实现连接
 
-## Getting Started
+## 近期要做的
 
-For help getting started with Flutter, view our online
-[documentation](https://flutter.io/).
+实现文件读写将用户名密码保存起来。
