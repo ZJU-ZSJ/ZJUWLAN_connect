@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 
 void main() => runApp(new MyApp());
 
@@ -39,30 +40,108 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final TextEditingController _textController = new TextEditingController();
+  final TextEditingController controller1 = new TextEditingController();
+  final TextEditingController controller2 = new TextEditingController();
   final String url = "https://net.zju.edu.cn/include/auth_action.php";
   String _data="";
   String id = "";
   String password = "";
   String login_data="";
   RegExp login_ok=new RegExp("login_ok");
+  String buttonstr="连接";
+  VoidCallback func=null;
+  void showMessage(String name) {
+    showDialog<Null>(
+        context: context,
+        child: new AlertDialog(
+            content: new Text(name),
+            actions: <Widget>[
+              new FlatButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: new Text('确定')
+              )
+            ]
+        )
+    );
+  }
 
-  void _handleSubmitted(String text) {
-    _textController.clear();
+  void initState() {
+    // 调用原initState方法内容
+    super.initState();
+    func=_connect;
+    /*
+     * 调用_readCounter函数，读取点击数
+     *  将点击数作为参数，创建一个函数
+     */
+    _readinfo().then((String contents){
+      setState((){
+        print(contents);
+        List str = contents.split('||');
+        id = controller1.text = str[0];
+        password = controller2.text = str[1];
+      });
+    });
+  }
+
+  Future<String> _readinfo() async {
+    try {
+      /*
+       * 获取本地文件目录
+       * 关键字await表示等待操作完成
+       */
+      File file = await _getLocalFile();
+      // 使用给定的编码将整个文件内容读取为字符串
+      String  contents = await file.readAsString();
+      // 返回文件中的点击数
+      return contents;
+    } on FileSystemException {
+      // 发生异常时返回默认值
+      return "||";
+    }
+  }
+  // _getLocalFile函数，获取本地文件目录
+  Future<File> _getLocalFile() async {
+    // 获取本地文档目录
+    String dir = (await getApplicationDocumentsDirectory()).path;
+    // 返回本地文件目录
+    return new File('$dir/connect.txt');
   }
 
   void _connect() async {
-    var response = await http.post(Uri.encodeFull(url), headers: {"Accept": "application/json"},body: {"action": "login", "username":id,"password": password,"ac_id":"3","ajax":"1"});
-    print(response.body);
-    print(id);
-    print(password);
-    setState((){
-      _data = response.body;
-      if(login_ok.hasMatch(_data)==true)
-        login_data="登陆成功";
-      else
-        login_data="登录失败";
-    });
+    int times=10;
+    func=null;
+    buttonstr="正在连接";
+    while(times>0) {
+      times--;
+      var response = await http.post(
+          Uri.encodeFull(url), headers: {"Accept": "application/json"},
+          body: {
+            "action": "login",
+            "username": id,
+            "password": password,
+            "ac_id": "3",
+            "ajax": "1"
+          });
+      print(response.body);
+      print(id);
+      print(password);
+      await (await _getLocalFile()).writeAsString('$id' + '||' + '$password');
+      setState(() {
+        _data = response.body;
+        if (login_ok.hasMatch(_data) == true)
+          {
+            showMessage("登陆成功！");
+            times=-1;
+          }
+      });
+      sleep(new Duration(seconds:1));
+    }
+    if (times==0)
+      showMessage("登陆失败！");
+    func=_connect;
+    buttonstr="连接";
   }
 
   @override
@@ -86,7 +165,11 @@ class _MyHomePageState extends State<MyHomePage> {
             child: new Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                new TextField(
+                new TextField(style: new TextStyle(
+                fontSize: 18.0,
+                color: Colors.lightBlue,
+                fontWeight: FontWeight.bold
+            ),
                   decoration: new InputDecoration(
                       hintText: "输入学号"
                   ),
@@ -95,18 +178,14 @@ class _MyHomePageState extends State<MyHomePage> {
                       id = str;
                     });
                   },
-//                onChanged: (String str) {
-//                  setState((){
-//                    result = str;
-//                  });
-//                },
+                  controller: controller1,
                 ),
-                new Text(id, style: new TextStyle(
+                new TextField(style: new TextStyle(
                     fontSize: 18.0,
                     color: Colors.lightBlue,
                     fontWeight: FontWeight.bold
-                )),
-                new TextField(
+                ),
+                  obscureText:true,
                   decoration: new InputDecoration(
                       hintText: "输入密码"
                   ),
@@ -116,30 +195,17 @@ class _MyHomePageState extends State<MyHomePage> {
                     });
 
                   },
-//                onChanged: (String str) {
-//                  setState((){
-//                    result = str;
-//                  });
-//                },
+                  controller: controller2,
                 ),
-                new Text(password, style: new TextStyle(
-                    fontSize: 18.0,
-                    color: Colors.lightBlue,
-                    fontWeight: FontWeight.bold
-                )),
-                new Text(login_data, style: new TextStyle(
-                    fontSize: 18.0,
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold
-                )),
+
                 new Padding(padding: new EdgeInsets.all(10.0)),
                 new RaisedButton(
                   child: new Text(
-                    "连接",
+                    buttonstr,
                     style: new TextStyle(color: Colors.white),
                   ),
                   color: Colors.blueGrey,
-                  onPressed: _connect,
+                  onPressed: func,
                 )
               ],
             ),
